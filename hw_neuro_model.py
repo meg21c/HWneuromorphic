@@ -25,6 +25,7 @@ def Hw_backprop_layer(self, G_y, hconfig, pm, aux):
     G_weight_flag_posi=np.where(G_weight>0,self.dLTD(pm['w']),0)
     G_weight_flag_nega=np.where(G_weight<0,self.dLTP(pm['w']),0)
     G_weight = G_weight_flag_posi+G_weight_flag_nega
+    aaa
     #--------------------------------------------------- 여기까지
     
     G_bias = np.sum(G_y, axis =0)
