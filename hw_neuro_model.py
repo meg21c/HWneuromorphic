@@ -34,7 +34,7 @@ def Hw_backprop_layer(self, G_y, hconfig, pm, aux):
     
     self.update_param(pm, 'w', G_weight) #depend on "use_adam" True or False
     self.update_param(pm, 'b', G_bias)
-    
+     
     return G_input
 
 HwModel.backprop_layer = Hw_backprop_layer
