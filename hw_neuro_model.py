@@ -6,7 +6,7 @@ from ctypes import sizeof
 from mlp_model import  *
 
 class HwModel(MlpModel):
-   def __init__(self, name, dataset, hconfigs,params):
+   def __init__(self, name, dataset, hconfigs, params):
        self.use_hw = False
        self.params = params
        super(HwModel,self).__init__(name, dataset, hconfigs)
@@ -20,14 +20,7 @@ def Hw_backprop_layer(self, G_y, hconfig, pm, aux):
     
     g_y_weight = x.transpose()
     G_weight = np.matmul(g_y_weight, G_y)
-    
-    #---------------------------------------------------
-    G_weight_flag_posi=np.where(G_weight>0,self.dLTD(pm['w']),0)
-    G_weight_flag_nega=np.where(G_weight<0,self.dLTP(pm['w']),0)
-    G_weight = G_weight_flag_posi+G_weight_flag_nega
-    aaa
-    #--------------------------------------------------- 여기까지
-    
+
     G_bias = np.sum(G_y, axis =0)
     
     g_y_input = pm['w'].transpose()
@@ -44,41 +37,40 @@ HwModel.backprop_layer = Hw_backprop_layer
 def Hw_update_param(self, pm, key, delta):
     if self.use_hw:
         delta = self.eval_hw_delta(pm, key, delta)
-    
+        
     pm[key] -= self.learning_rate *delta        # x2 = x1 - a* [m^/sqrt(v^+e)]=delta
 HwModel.update_param = Hw_update_param
 
 
 def Hw_eval_hw_delta(self, pm, key, delta):
-    ro_1 = 0.9
-    ro_2 = 0.999
-    epsilon = 1e-8
-    skey, tkey, step = 's'+key, 't'+key, 'n'+key        #'w' or 'b' = key, sw, tw, nw
-    if skey not in pm:
-        pm[skey] = np.zeros(pm[key].shape)
-        pm[tkey] = np.zeros(pm[key].shape)
-        pm[step]=0
-        
-    s = pm[skey] = ro_1*pm[skey] +(1-ro_1)*delta
-    t = pm[tkey] = ro_2*pm[tkey] +(1-ro_2)*(delta*delta)
+    #---------------------------------------------------
     
-    pm[step] +=1
-    s = s / (1-np.power(ro_1, pm[step]))
-    t = t / (1-np.power(ro_2, pm[step]))
+    G_weight_flag_posi=np.where(delta>0,-self.dLTD(pm[key]),0)
+    G_weight_flag_nega=np.where(delta<0,self.dLTP(pm[key]),0)
     
-    return s / (np.sqrt(t)+epsilon)
+    G_weight = G_weight_flag_posi+G_weight_flag_nega    
+    #--------------------------------------------------- 여기까지
+
+    
+    return G_weight
 HwModel.eval_hw_delta = Hw_eval_hw_delta
 
 
 def dLTP(self, curW):
     Ap, Bp, Gpmax, Gpmin = self.params[0]
-    return Ap*np.exp(-Bp*((curW-Gpmin)/(Gpmax-Gpmin)))
+    LTP=Ap*np.exp(-Bp*((curW-Gpmin)/(Gpmax-Gpmin)))
+    LTP=np.where(LTP>Gpmax, Gpmax, LTP)
+    LTP=np.where(LTP<Gpmin, Gpmin, LTP)
+    return LTP
 HwModel.dLTP = dLTP
 
 
 def dLTD(self, curW):
     Ad, Bd, Gdmax, Gdmin = self.params[1]
-    return Ad*np.exp(-Bd*((Gdmax-curW)/(Gdmax-Gdmin)))
+    LTD=Ad*np.exp(-Bd*((Gdmax-curW)/(Gdmax-Gdmin)))
+    LTD=np.where(LTD>Gdmax, Gdmax, LTD)
+    LTD=np.where(LTD<Gdmin, Gdmin, LTD)
+    return LTD
 HwModel.dLTD = dLTD
 
 
