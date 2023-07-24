@@ -56,10 +56,13 @@ def mlp_alloc_layer_param(self, input_shape, hconfig):
 MlpModel.alloc_layer_param = mlp_alloc_layer_param
 
 def mlp_alloc_param_pair(self, shape): # ex shape =[input_cnt, output_cnt]
-    weight = np.random.normal(0, self.rand_std, shape)
+    #weight = np.random.normal(0, self.rand_std, shape)
+    weight = np.zeros(shape)
     bias =  np.zeros(shape[-1])
     return weight, bias
 MlpModel.alloc_param_pair = mlp_alloc_param_pair
+
+
 
 #================================================================================================    
     

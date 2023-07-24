@@ -12,6 +12,7 @@ class HwModel(MlpModel):
        super(HwModel,self).__init__(name, dataset, hconfigs)
        #params=[['Ap', 'Bp', 'Gpmax','Gpmin'], ['Ad', 'Bd', 'Gdmax', 'Gdmin']]
        
+       
 #use_adam이 True 인지 False인지에 따라서 update방식을 변경하기 위해서 만든 method
 def Hw_backprop_layer(self, G_y, hconfig, pm, aux):
     x, y = aux       
@@ -36,23 +37,57 @@ HwModel.backprop_layer = Hw_backprop_layer
 
 def Hw_update_param(self, pm, key, delta):
     if self.use_hw:
-        delta = self.eval_hw_delta(pm, key, delta)
+        delta = self.eval_hw_delta(pm, key, delta) #delta = d(G+ - G-)
         
     pm[key] -= self.learning_rate *delta        # x2 = x1 - a* [m^/sqrt(v^+e)]=delta
 HwModel.update_param = Hw_update_param
 
 
-def Hw_eval_hw_delta(self, pm, key, delta):
-    #---------------------------------------------------
+# def adam_eval_adam_delta(self, pm, key, delta):
+#     ro_1 = 0.9
+#     ro_2 = 0.999
+#     epsilon = 1e-8
+#     skey, tkey, step = 's'+key, 't'+key, 'n'+key        #'w' or 'b' = key, sw, tw, nw
+#     if skey not in pm:
+#         pm[skey] = np.zeros(pm[key].shape)
+#         pm[tkey] = np.zeros(pm[key].shape)
+#         pm[step]=0
+        
+#     s = pm[skey] = ro_1*pm[skey] +(1-ro_1)*delta
+#     t = pm[tkey] = ro_2*pm[tkey] +(1-ro_2)*(delta*delta)
     
-    G_weight_flag_posi=np.where(delta>0,-self.dLTD(pm[key]),0)
-    G_weight_flag_nega=np.where(delta<0,self.dLTP(pm[key]),0)
+#     pm[step] +=1
+#     s = s / (1-np.power(ro_1, pm[step]))
+#     t = t / (1-np.power(ro_2, pm[step]))
     
-    G_weight = G_weight_flag_posi+G_weight_flag_nega    
-    #--------------------------------------------------- 여기까지
+#     return s / (np.sqrt(t)+epsilon)
 
+
+def Hw_eval_hw_delta(self, pm, key, delta):
+    dGm_up, dGm_down, dGp_up, dGp_down  = 0,0,0,0
+    dGpkey, dGmkey = 'dGp'+key, 'dGm'+key 
     
-    return G_weight
+    if dGpkey not in pm:
+        pm[dGpkey] = np.zeros(pm[key].shape)
+        pm[dGmkey] = np.zeros(pm[key].shape)
+        
+    #---------------------------------------------------
+    #G를 내려야 할때(delta>0, Gp는 내리고 Gm은 올린다. )
+    dGm_up= np.where(delta>0,self.dLTP(pm[dGmkey]),0)
+    dGp_down = np.where(delta>0,-self.dLTD(pm[dGpkey]),0)
+    
+    #G를 올려야하는 좌표 (delta<0, Gp는 내리고 Gm은 내린다. )
+    dGm_down= np.where(delta<0,-self.dLTD(pm[dGmkey]),0)
+    dGp_up = np.where(delta<0,self.dLTP(pm[dGpkey]),0)
+    
+    pm[dGpkey] = dGp_up+dGp_down
+    pm[dGmkey] = dGm_up+dGm_down
+    # np.savetxt('./delta.csv', delta, delimiter=',')
+    # np.savetxt('./dGp.csv', pm[dGpkey], delimiter=',')
+    # np.savetxt('./dGm.csv', pm[dGmkey], delimiter=',')
+    # input()
+    
+    return pm[dGpkey] + pm[dGmkey]
 HwModel.eval_hw_delta = Hw_eval_hw_delta
 
 
